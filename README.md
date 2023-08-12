@@ -1,2 +1,3 @@
 # kataru-godot
-Godot bindings for Kataru
+
+Godot bindings for Kataru using GDExtension.
