@@ -1,0 +1,46 @@
+---
+# Define what namespace this file is in.
+namespace: global
+
+state:
+  coffee: 0
+  $passage.completed: 0
+
+# Configure the scene. List your characters, commands, etc.
+characters:
+  May:
+  June:
+
+commands:
+  Wait:
+    duration: 0.3
+
+  $character.SetAnimatorTrigger:
+    clip: ""
+
+onExit:
+  set:
+    $passage.completed +: 1
+---
+Start:
+  - May: Welcome to my story!
+  - June: Want a coffee?
+  - choices:
+      Yes: YesCoffee
+      No: NoCoffee
+
+YesCoffee:
+  - May: Yeah, thanks!
+  - set:
+      $coffee +: 1
+  - May.SetAnimatorTrigger: ["drinkcoffee"]
+  - call: End
+
+NoCoffee:
+  - May: No thanks.
+  - Wait: { duration: 1 }
+  - June: Want to end this story?
+  - call: End
+
+End:
+  - May: The end!

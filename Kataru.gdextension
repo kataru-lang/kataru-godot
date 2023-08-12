@@ -1,0 +1,14 @@
+[configuration]
+compatibility_minimum = 4.1
+entry_symbol = "gdext_rust_init"
+reloadable = true
+
+[libraries]
+# linux.debug.x86_64 = "res://../kataru-godot/target/debug/libkataru-godot.so"
+# linux.release.x86_64 = "res://../kataru-godot/target/release/libkataru-godot.so"
+# macos.debug = "res://../kataru-godot/target/debug/libkataru-godot.dylib"
+# macos.debug.arm64 = "res://../kataru-godot/target/debug/libkataru-godot.dylib"
+# macos.release = "res://../kataru-godot/target/release/libkataru-godot.dylib"
+# macos.release.arm64 = "res://../kataru-godot/target/release/libkataru-godot.dylib"
+windows.debug.x86_64 = "res://kataru-godot/target/x86_64-pc-windows-msvc/debug/kataru_godot.dll"
+# windows.release.x86_64 = "res://kataru-godot/target/x86_64-pc-windows-msvc/release/kataru_godot.dll"
