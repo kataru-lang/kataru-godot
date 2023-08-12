@@ -1,13 +1,16 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+use godot::prelude::*;
+
+struct KataruExtension;
+
+#[gdextension]
+unsafe impl ExtensionLibrary for KataruExtension {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
+    fn extension_load() {
         let result = add(2, 2);
         assert_eq!(result, 4);
     }
