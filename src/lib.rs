@@ -1,5 +1,3 @@
-use std::default;
-
 use godot::prelude::*;
 use kataru::*;
 
@@ -8,45 +6,63 @@ struct KataruExtension;
 #[gdextension]
 unsafe impl ExtensionLibrary for KataruExtension {}
 
+// Debug levels.
+const DEBUG_INFO: u8 = 1;
+const DEBUG_VERBOSE: u8 = 2;
+
 #[derive(GodotClass)]
 pub struct KataruDialogue {
     pub name: String,
     pub text: String,
 }
-impl From<Dialogue> for KataruDialogue {
-    fn from(value: Dialogue) -> Self {
+impl From<&Dialogue> for KataruDialogue {
+    fn from(value: &Dialogue) -> Self {
         Self {
-            name: value.name,
-            text: value.text,
+            name: value.name.clone(),
+            text: value.text.clone(),
+        }
+    }
+}
+
+#[derive(GodotClass)]
+pub struct KataruChoices {
+    pub choices: Vec<String>,
+    pub timeout: f64,
+}
+impl From<&Choices> for KataruChoices {
+    fn from(value: &Choices) -> Self {
+        Self {
+            choices: value.choices.clone(),
+            timeout: value.timeout,
         }
     }
 }
 
 #[derive(GodotClass)]
 #[class(base=Node)]
-pub struct Kataru {
+pub struct KataruInterface {
     pub story_path: String,
     pub bookmark_path: String,
 
     story: Story,
     bookmark: Bookmark,
     runner: Option<Runner<'static>>,
+    debug_level: u8,
 
     #[base]
     base: Base<Node>,
 }
 
 #[godot_api]
-impl NodeVirtual for Kataru {
+impl NodeVirtual for KataruInterface {
     fn init(base: Base<Node>) -> Self {
-        godot_print!("Welcome to Kataru!"); // Prints to the Godot console
-
         Self {
             story_path: "".to_string(),
             bookmark_path: "".to_string(),
             story: Story::default(),
             bookmark: Bookmark::default(),
             runner: None,
+            debug_level: 0,
             base,
         }
     }
@@ -58,8 +74,12 @@ unsafe fn extend_lifetime<'a>(r: Runner<'a>) -> Runner<'static> {
     std::mem::transmute::<Runner<'a>, Runner<'static>>(r)
 }
 
+fn serde_to_variant<T: serde::Serialize>(value: &T) -> Variant {
+    Variant::from(serde_json::to_string(value).unwrap())
+}
+
 #[godot_api]
-impl Kataru {
+impl KataruInterface {
     fn try_load(&mut self, default_passage: String) -> Result<()> {
         self.story = Story::load(&self.story_path)?;
         self.bookmark = match Bookmark::load(&self.bookmark_path) {
@@ -89,11 +109,16 @@ impl Kataru {
         story_path: GodotString,
         bookmark_path: GodotString,
         default_passage: GodotString,
+        debug_level: u8,
     ) {
-        godot_print!("Load story!"); // Prints to the Godot console
-
         self.story_path = story_path.to_string();
         self.bookmark_path = bookmark_path.to_string();
+        self.debug_level = debug_level;
+
+        if self.debug_level >= DEBUG_INFO {
+            godot_print!("Loading Kataru...")
+        }
+
         if let Err(err) = self.try_load(default_passage.to_string()) {
             godot_error!("{}", err)
         }
@@ -116,25 +141,29 @@ impl Kataru {
     #[func]
     pub fn next(&mut self, input: GodotString) {
         if let Some(runner) = &mut self.runner {
-            godot_print!("{:#?}", runner.bookmark);
-            let line = runner.next(&input.to_string()).unwrap().clone();
-            godot_print!("{:#?}", line);
-            match &line {
-                Line::Dialogue(dialogue) => {
-                    self.base.emit_signal(
-                        "dialogue".into(),
-                        &[
-                            Variant::from(dialogue.name.clone()),
-                            Variant::from(dialogue.text.clone()),
-                        ],
-                    );
-                }
-                Line::Choices(_choices) => {}
-                Line::Command(_command) => {}
-                Line::Input(_input_cmd) => {}
-                Line::InvalidChoice => {}
-                Line::End => {}
+            if self.debug_level > DEBUG_VERBOSE {
+                godot_print!("{:#?}", runner.bookmark);
             }
+            let line = runner.next(&input.to_string()).unwrap().clone();
+            if self.debug_level > DEBUG_INFO {
+                godot_print!("{:#?}", line);
+            }
+            match &line {
+                Line::Dialogue(dialogue) => self
+                    .base
+                    .emit_signal("dialogue_json".into(), &[serde_to_variant(dialogue)]),
+                Line::Choices(choices) => self
+                    .base
+                    .emit_signal("choices_json".into(), &[serde_to_variant(choices)]),
+                Line::Command(command) => self
+                    .base
+                    .emit_signal("command_json".into(), &[serde_to_variant(command)]),
+                Line::Input(input_cmd) => self
+                    .base
+                    .emit_signal("input_json".into(), &[serde_to_variant(input_cmd)]),
+                Line::InvalidChoice => self.base.emit_signal("invalid_choice".into(), &[]),
+                Line::End => self.base.emit_signal("end".into(), &[]),
+            };
         }
     }
 
@@ -154,11 +183,20 @@ impl Kataru {
     fn loaded();
 
     #[signal]
-    fn dialogue(name: GodotString, text: GodotString);
+    fn dialogue_json(dialogue: GodotString);
 
     #[signal]
-    fn choices();
+    fn choices_json(choices: GodotString);
 
     #[signal]
-    fn input();
+    fn command_json(command: GodotString);
+
+    #[signal]
+    fn input_json(input: GodotString);
+
+    #[signal]
+    fn invalid_choice();
+
+    #[signal]
+    fn end();
 }

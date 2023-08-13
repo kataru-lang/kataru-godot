@@ -8,3 +8,5 @@ crate-type = ["cdylib"]
 [dependencies]
 godot = {git = "https://github.com/godot-rust/gdext", branch = "master"}
 kataru = "0.1.0"
+serde = "1.0.183"
+serde_json = "1.0.104"
