@@ -6,18 +6,32 @@
 #
 # Kataru="*res://kataru-godot/kataru.gd"
 # ```
-extends KataruInterface
+@tool
+extends Node
 
 const STORY_PATH = "res://kataru-story"
+const COMPILED_STORY_PATH = "res://kataru-story.bin"
 const BOOKMARK_PATH = "user://kataru-bookmark.yml"
 const DEFAULT_PASSAGE = "Start"
-const DEBUG_LEVEL = 0
+const DEBUG_LEVEL = 1
+
+# Interface with Rust.
+var ffi = KataruInterface.new()
 
 signal dialogue(char_name: String, text: String, attributes: Array)
 signal choices(choices: Array, timeout: float)
 signal command(cmd_name: String, params: Dictionary)
-signal input(input: Dictionary, timeout: float)
+signal input_command(input: Dictionary, timeout: float)
 
+
+func run_passage(passage: String):
+	self.ffi.run_passage(passage)
+
+func run_passage_until_choice(passage: String):
+	self.ffi.run_passage_until_choice(passage)
+
+func next(input: String):
+	self.ffi.next(input)
 
 func _on_dialogue_json(json: String):
 	var result = JSON.parse_string(json)
@@ -44,25 +58,26 @@ func _on_input_json(json: String):
 	var result = JSON.parse_string(json)
 	if result == null:
 		return null
-	self.input.emit(result["input"], result["timeout"])
-
+	self.input_command.emit(result["input"], result["timeout"])
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
-	# Connect callbacks.
-	self.dialogue_json.connect(_on_dialogue_json)
-	self.choices_json.connect(_on_choices_json)
-	self.command_json.connect(_on_command_json)
-	self.input_json.connect(_on_input_json)
-
-	print(ProjectSettings.globalize_path(STORY_PATH))
-	print(ProjectSettings.globalize_path(BOOKMARK_PATH))
-	self.load(
-		ProjectSettings.globalize_path(STORY_PATH),
+	self.ffi.init(
+		ProjectSettings.globalize_path(COMPILED_STORY_PATH),
 		ProjectSettings.globalize_path(BOOKMARK_PATH),
 		DEFAULT_PASSAGE,
-		DEBUG_LEVEL
-	)
+		DEBUG_LEVEL)
+
+	if !OS.has_feature("standalone"):
+		self.ffi.compile(ProjectSettings.globalize_path(STORY_PATH))
+	
+	self.ffi.load()
+
+	# Connect callbacks.
+	self.ffi.dialogue_json.connect(_on_dialogue_json)
+	self.ffi.choices_json.connect(_on_choices_json)
+	self.ffi.command_json.connect(_on_command_json)
+	self.ffi.input_json.connect(_on_input_json)
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.

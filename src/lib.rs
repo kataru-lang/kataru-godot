@@ -11,34 +11,6 @@ const DEBUG_INFO: u8 = 1;
 const DEBUG_VERBOSE: u8 = 2;
 
 #[derive(GodotClass)]
-pub struct KataruDialogue {
-    pub name: String,
-    pub text: String,
-}
-impl From<&Dialogue> for KataruDialogue {
-    fn from(value: &Dialogue) -> Self {
-        Self {
-            name: value.name.clone(),
-            text: value.text.clone(),
-        }
-    }
-}
-
-#[derive(GodotClass)]
-pub struct KataruChoices {
-    pub choices: Vec<String>,
-    pub timeout: f64,
-}
-impl From<&Choices> for KataruChoices {
-    fn from(value: &Choices) -> Self {
-        Self {
-            choices: value.choices.clone(),
-            timeout: value.timeout,
-        }
-    }
-}
-
-#[derive(GodotClass)]
 #[class(base=Node)]
 pub struct KataruInterface {
     pub story_path: String,
@@ -47,7 +19,9 @@ pub struct KataruInterface {
     story: Story,
     bookmark: Bookmark,
     runner: Option<Runner<'static>>,
+    default_passage: String,
     debug_level: u8,
+    line: Line,
 
     #[base]
     base: Base<Node>,
@@ -62,7 +36,9 @@ impl NodeVirtual for KataruInterface {
             story: Story::default(),
             bookmark: Bookmark::default(),
             runner: None,
+            default_passage: "".to_string(),
             debug_level: 0,
+            line: Line::End,
             base,
         }
     }
@@ -80,18 +56,47 @@ fn serde_to_variant<T: serde::Serialize>(value: &T) -> Variant {
 
 #[godot_api]
 impl KataruInterface {
-    fn try_load(&mut self, default_passage: String) -> Result<()> {
-        self.story = Story::load(&self.story_path)?;
-        self.bookmark = match Bookmark::load(&self.bookmark_path) {
-            Ok(bookmark) => bookmark,
+
+    #[func]
+    pub fn init(
+        &mut self,
+        story_path: GodotString,
+        bookmark_path: GodotString,
+        default_passage: GodotString,
+        debug_level: u8,
+    ) {
+        self.story_path = story_path.to_string();
+        self.bookmark_path = bookmark_path.to_string();
+        self.default_passage = default_passage.to_string();
+        self.debug_level = debug_level;
+
+        if self.debug_level >= DEBUG_INFO {
+            godot_print!("Kataru initialized.")
+        }
+    }
+
+    fn try_load_bookmark(&mut self) -> Result<Bookmark> {
+        match Bookmark::load(&self.bookmark_path) {
+            Ok(bookmark) => Ok(bookmark),
             Err(_err) => {
+                if self.debug_level >= DEBUG_INFO {
+                    godot_print!(
+                        "Bookmark did not exist or was malformed. Createing a new bookmark at {}",
+                        self.bookmark_path
+                    );
+                }
                 let mut bookmark = Bookmark::default();
                 bookmark.init_state(&self.story);
-                bookmark.set_passage(default_passage);
+                bookmark.set_passage(self.default_passage.clone());
                 bookmark.save(&self.bookmark_path)?;
-                bookmark
+                Ok(bookmark)
             }
-        };
+        }
+    }
+
+    fn try_load(&mut self) -> Result<()> {
+        self.story = Story::load(&self.story_path)?;
+        self.bookmark = self.try_load_bookmark()?;
         // Runner holds references to the story and bookmark. We ensure that whenveer their references
         // are invalidated, we will reconstruct the runner.
         unsafe {
@@ -104,38 +109,33 @@ impl KataruInterface {
     }
 
     #[func]
-    pub fn load(
-        &mut self,
-        story_path: GodotString,
-        bookmark_path: GodotString,
-        default_passage: GodotString,
-        debug_level: u8,
-    ) {
-        self.story_path = story_path.to_string();
-        self.bookmark_path = bookmark_path.to_string();
-        self.debug_level = debug_level;
-
+    fn load(&mut self) {
         if self.debug_level >= DEBUG_INFO {
-            godot_print!("Loading Kataru...")
+            godot_print!("Loading Kataru story and initializing runner.");
         }
-
-        if let Err(err) = self.try_load(default_passage.to_string()) {
-            godot_error!("{}", err)
+        if let Err(err) = self.try_load() {
+            godot_error!("{}", err);
         }
-
         self.base.emit_signal("loaded".into(), &[]);
     }
 
-    #[func]
-    pub fn validate(&mut self) {
-        match Validator::new(&self.story, &mut self.bookmark).validate() {
-            Err(e) => {
-                godot_error!("{}", format!("{}", e));
-            }
-            Ok(_) => {
-                godot_print!("{}", "Validated story successfully.");
-            }
-        }
+    pub fn validate(&mut self) -> Result<()> {
+        Validator::new(&self.story, &mut self.bookmark).validate()
+    }
+
+    fn try_compile(&mut self, story_path: String) -> Result<()> {
+        self.story = Story::load(story_path)?;
+        self.bookmark = self.try_load_bookmark()?;
+        self.validate()?;
+        self.story.save(&self.story_path)?;
+        Ok(())
+    }
+    #[func] pub fn compile(&mut self, 
+        story_path: GodotString) {
+        godot_print!("Kataru Compile:");
+        if let Err(err) = self.try_compile(story_path.to_string()) {
+            godot_error!("Compile error: {}", err)
+         }
     }
 
     #[func]
@@ -144,11 +144,11 @@ impl KataruInterface {
             if self.debug_level > DEBUG_VERBOSE {
                 godot_print!("{:#?}", runner.bookmark);
             }
-            let line = runner.next(&input.to_string()).unwrap().clone();
+            self.line = runner.next(&input.to_string()).unwrap().clone();
             if self.debug_level > DEBUG_INFO {
-                godot_print!("{:#?}", line);
+                godot_print!("{:#?}", self.line);
             }
-            match &line {
+            match &self.line {
                 Line::Dialogue(dialogue) => self
                     .base
                     .emit_signal("dialogue_json".into(), &[serde_to_variant(dialogue)]),
@@ -164,19 +164,38 @@ impl KataruInterface {
                 Line::InvalidChoice => self.base.emit_signal("invalid_choice".into(), &[]),
                 Line::End => self.base.emit_signal("end".into(), &[]),
             };
+        } else {
+            godot_error!("Attempted to call Kataru.next() before Kataru.load().")
         }
     }
 
     #[func]
-    pub fn goto_passage(&mut self, passage: GodotString) {
+    pub fn run_passage(&mut self, passage: GodotString) {
         if let Some(runner) = &mut self.runner {
             runner.bookmark.set_passage(passage.to_string());
             runner.bookmark.set_line(0);
             runner.bookmark.stack.clear();
             if let Err(err) = runner.goto() {
-                godot_error!("{}", err)
+                godot_error!("{}", err);
             }
         }
+        self.next("".into())
+    }
+
+    #[func]
+    pub fn run_passage_until_choice(&mut self, passage: GodotString) {
+        self.run_passage(passage);
+        loop {
+            match self.line {
+                Line::Choices(_) | Line::End => break,
+                _ => self.next("".into()),
+            }
+        }
+    }
+
+    #[func]
+    pub fn exit(&mut self) {
+        self.base.emit_signal("end".into(), &[]);
     }
 
     #[signal]
