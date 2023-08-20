@@ -17,5 +17,5 @@ func _on_dialogue(char_name: String, text: String, _attributes: Array):
 		print(char_name, ": ", text)
 
 func _on_command(cmd_name: String, params: Dictionary):
-	if String.begins_with(self.name + "."):
+	if cmd_name.begins_with(self.name + "."):
 		print(cmd_name, params)
