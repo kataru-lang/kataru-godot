@@ -56,7 +56,6 @@ fn serde_to_variant<T: serde::Serialize>(value: &T) -> Variant {
 
 #[godot_api]
 impl KataruInterface {
-
     #[func]
     pub fn init(
         &mut self,
@@ -77,7 +76,10 @@ impl KataruInterface {
 
     fn try_load_bookmark(&mut self) -> Result<Bookmark> {
         match Bookmark::load(&self.bookmark_path) {
-            Ok(bookmark) => Ok(bookmark),
+            Ok(mut bookmark) => {
+                bookmark.init_state(&self.story);
+                Ok(bookmark)
+            }
             Err(_err) => {
                 if self.debug_level >= DEBUG_INFO {
                     godot_print!(
@@ -130,12 +132,12 @@ impl KataruInterface {
         self.story.save(&self.story_path)?;
         Ok(())
     }
-    #[func] pub fn compile(&mut self, 
-        story_path: GodotString) {
+    #[func]
+    pub fn compile(&mut self, story_path: GodotString) {
         godot_print!("Kataru Compile:");
         if let Err(err) = self.try_compile(story_path.to_string()) {
             godot_error!("Compile error: {}", err)
-         }
+        }
     }
 
     #[func]

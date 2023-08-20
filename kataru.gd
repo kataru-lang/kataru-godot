@@ -27,11 +27,14 @@ signal input_command(input: Dictionary, timeout: float)
 func run_passage(passage: String):
 	self.ffi.run_passage(passage)
 
+
 func run_passage_until_choice(passage: String):
 	self.ffi.run_passage_until_choice(passage)
 
+
 func next(input: String):
 	self.ffi.next(input)
+
 
 func _on_dialogue_json(json: String):
 	var result = JSON.parse_string(json)
@@ -60,17 +63,19 @@ func _on_input_json(json: String):
 		return null
 	self.input_command.emit(result["input"], result["timeout"])
 
+
 # Called when the node enters the scene tree for the first time.
 func _ready():
 	self.ffi.init(
 		ProjectSettings.globalize_path(COMPILED_STORY_PATH),
 		ProjectSettings.globalize_path(BOOKMARK_PATH),
 		DEFAULT_PASSAGE,
-		DEBUG_LEVEL)
+		DEBUG_LEVEL
+	)
 
 	if !OS.has_feature("standalone"):
 		self.ffi.compile(ProjectSettings.globalize_path(STORY_PATH))
-	
+
 	self.ffi.load()
 
 	# Connect callbacks.
