@@ -10,10 +10,10 @@
 extends Node
 
 const STORY_PATH = "res://kataru-story"
-const COMPILED_STORY_PATH = "res://kataru-story.bin"
+const COMPILED_STORY_PATH = "res://kataru-story.yml"
 const BOOKMARK_PATH = "user://kataru-bookmark.yml"
 const DEFAULT_PASSAGE = "Start"
-const DEBUG_LEVEL = 1
+const DEBUG_LEVEL = 2
 
 # Interface with Rust.
 var ffi = KataruInterface.new()
@@ -33,35 +33,8 @@ func run_passage_until_choice(passage: String):
 
 
 func next(input: String):
+	print("Call next: ", input)
 	self.ffi.next(input)
-
-
-func _on_dialogue_json(json: String):
-	var result = JSON.parse_string(json)
-	if result == null:
-		return null
-	self.dialogue.emit(result["name"], result["text"], result["attributes"])
-
-
-func _on_choices_json(json: String):
-	var result = JSON.parse_string(json)
-	if result == null:
-		return null
-	self.choices.emit(result["choices"], result["timeout"])
-
-
-func _on_command_json(json: String):
-	var result = JSON.parse_string(json)
-	if result == null:
-		return null
-	self.command.emit(result["name"], result["params"])
-
-
-func _on_input_json(json: String):
-	var result = JSON.parse_string(json)
-	if result == null:
-		return null
-	self.input_command.emit(result["input"], result["timeout"])
 
 
 # Called when the node enters the scene tree for the first time.
@@ -79,10 +52,23 @@ func _ready():
 	self.ffi.load()
 
 	# Connect callbacks.
-	self.ffi.dialogue_json.connect(_on_dialogue_json)
-	self.ffi.choices_json.connect(_on_choices_json)
-	self.ffi.command_json.connect(_on_command_json)
-	self.ffi.input_json.connect(_on_input_json)
+	self.ffi.dialogue.connect(
+		func(char_name: String, text: String, attributes: String): self.dialogue.emit(
+			char_name, text, JSON.parse_string(attributes)
+		)
+	)
+	self.ffi.choices.connect(
+		func(choice_list: Array, timeout: float): self.choices.emit(choice_list, timeout)
+	)
+	self.ffi.command.connect(
+		func(cmd_name: String, params: String): self.command.emit(
+			cmd_name, JSON.parse_string(params)
+		)
+	)
+	self.ffi.input_command.connect(
+		func(inputs: Dictionary, timeout: float): self.input.emit(inputs, timeout)
+	)
+	self.ffi.fatal.connect(func(message: String): assert(message != "", message))
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
