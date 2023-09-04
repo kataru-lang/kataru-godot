@@ -11,11 +11,16 @@
 @tool
 extends Node
 
+enum DebugLevel { NONE, INFO, VERBOSE }
+
 const STORY_PATH = "res://kataru-story"
 const COMPILED_STORY_PATH = "res://kataru-story.bin"
+const CODEGEN_PATH = "res://kataru-godot/characters.gd"
 const BOOKMARK_PATH = "user://kataru-bookmark.yml"
 const DEFAULT_PASSAGE = "Start"
-const DEBUG_LEVEL = 2
+const DEBUG_LEVEL = DebugLevel.INFO
+
+const Character = preload("res://kataru-godot/characters.gd")
 
 # Interface with Rust.
 var ffi = KataruInterface.new()
@@ -25,7 +30,7 @@ var ffi = KataruInterface.new()
 # ------------------------------------------------------------------------------
 
 # Signals a character saying a line of dialogue.
-signal dialogue(char_name: String, text: String, attributes: Array)
+signal dialogue(character: String, text: String, attributes: Array)
 
 # Signals an array of choices that the player can make.
 signal choices(choices: Array, timeout: float)
@@ -35,6 +40,9 @@ signal command(cmd_name: String, params: Dictionary)
 
 # Signals a command asking for input from the user to be stored in Kataru state.
 signal input_command(input: Dictionary, timeout: float)
+
+# Signals that Kataru has loaded. Other autoload scripts can wait for this signal before running.
+signal loaded
 
 
 # Runs the first line in a given passage.
@@ -54,20 +62,27 @@ func next(input: String):
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
+	# Connect callbacks used in init.
+	self.ffi.loaded.connect(func(): self.loaded.emit())
+	self.ffi.fatal.connect(func(message: String): assert(false, message))
+
 	# Provide a story source path to Rust to compile the story to bytecode, but only if we're in the editor.
 	var story_src_path = ""
+	var codegen_path = ""
 	if !OS.has_feature("standalone"):
 		story_src_path = ProjectSettings.globalize_path(STORY_PATH)
+		codegen_path = ProjectSettings.globalize_path(CODEGEN_PATH)
 
 	self.ffi.init(
 		story_src_path,
 		ProjectSettings.globalize_path(COMPILED_STORY_PATH),
 		ProjectSettings.globalize_path(BOOKMARK_PATH),
+		codegen_path,
 		DEFAULT_PASSAGE,
 		DEBUG_LEVEL
 	)
 
-	# Connect callbacks.
+	# Connect remaining callbacks.
 	self.ffi.dialogue.connect(
 		func(char_name: String, text: String, attributes: String): self.dialogue.emit(
 			char_name, text, JSON.parse_string(attributes)
@@ -84,7 +99,6 @@ func _ready():
 	self.ffi.input_command.connect(
 		func(inputs: Dictionary, timeout: float): self.input.emit(inputs, timeout)
 	)
-	self.ffi.fatal.connect(func(message: String): assert(message != "", message))
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.

@@ -1,5 +1,7 @@
 extends Node
 
+@export var character: Kataru.Character.Id
+
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
@@ -13,8 +15,10 @@ func _process(_delta):
 
 
 func _on_dialogue(char_name: String, text: String, _attributes: Array):
-	if self.name == char_name:
+	# print("Kataru name: ", Kataru.char_name(self.character))
+	if Kataru.Character.Id.keys()[self.character] == char_name:
 		print(char_name, ": ", text)
+
 
 func _on_command(cmd_name: String, params: Dictionary):
 	if cmd_name.begins_with(self.name + "."):
