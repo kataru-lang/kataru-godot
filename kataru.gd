@@ -73,13 +73,17 @@ func _ready():
 		story_src_path = ProjectSettings.globalize_path(STORY_PATH)
 		codegen_path = ProjectSettings.globalize_path(CODEGEN_PATH)
 
-	self.ffi.init(
-		story_src_path,
-		ProjectSettings.globalize_path(COMPILED_STORY_PATH),
-		ProjectSettings.globalize_path(BOOKMARK_PATH),
-		codegen_path,
-		DEFAULT_PASSAGE,
-		DEBUG_LEVEL
+	(
+		self
+		. ffi
+		. init(
+			story_src_path,
+			ProjectSettings.globalize_path(COMPILED_STORY_PATH),
+			ProjectSettings.globalize_path(BOOKMARK_PATH),
+			codegen_path,
+			DEFAULT_PASSAGE,
+			DEBUG_LEVEL,
+		)
 	)
 
 	# Connect remaining callbacks.

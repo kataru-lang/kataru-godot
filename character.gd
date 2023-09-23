@@ -1,6 +1,11 @@
+@tool
 extends Node
 
-@export var character: Kataru.Character.Id
+var character: String
+
+
+func _get_property_list():
+	return [Kataru.Character.property("character")]
 
 
 # Called when the node enters the scene tree for the first time.
@@ -16,7 +21,7 @@ func _process(_delta):
 
 func _on_dialogue(char_name: String, text: String, _attributes: Array):
 	# print("Kataru name: ", Kataru.char_name(self.character))
-	if Kataru.Character.Id.keys()[self.character] == char_name:
+	if self.character == char_name:
 		print(char_name, ": ", text)
 
 
