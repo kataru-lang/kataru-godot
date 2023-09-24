@@ -3,11 +3,13 @@
 const August = "August"
 const June = "June"
 const May = "May"
+const Test3 = "Test3"
 
 const NAMES: Array[String] = [
     August,
     June,
-    May
+    May,
+    Test3
 ]
 
 # Returns the character property for usage in the editor.

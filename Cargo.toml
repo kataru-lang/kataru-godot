@@ -6,6 +6,7 @@ version = "0.1.0"
 crate-type = ["cdylib"]
 
 [dependencies]
+glob = "0.3.1"
 godot = {git = "https://github.com/godot-rust/gdext", branch = "master"}
 kataru = "0.1.0"
 serde = "1.0.183"

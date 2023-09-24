@@ -1,3 +1,6 @@
+use std::path::{Path, PathBuf};
+
+use glob::glob;
 use godot::prelude::*;
 use kataru::*;
 
@@ -12,13 +15,30 @@ pub const DEBUG_INFO: u8 = 1;
 pub const DEBUG_VERBOSE: u8 = 2;
 mod codegen;
 
+fn last_modified_time(path: &PathBuf) -> Option<std::time::SystemTime> {
+    glob(path.to_str()?)
+        .expect("Couldn't access local directory")
+        .flatten() // Remove failed
+        .filter(|f| f.metadata().is_ok() && !f.metadata().unwrap().is_dir()) // Filter out directories (only consider files)
+        .map(|f| f.metadata().unwrap().modified().unwrap())
+        // Get the most recently modified file
+        .max()
+}
+
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct KataruInterface {
+    story_src_path: String,
+    story_path: String,
     bookmark_path: String,
+    codegen_path: String,
     default_passage: String,
     debug_level: u8,
     runner: Option<Runner>,
+    watch_dir: Option<PathBuf>,
+    watch_poll_time: f64,
+    watch_poll_interval: f64,
+    modified_time: Option<std::time::SystemTime>,
 
     #[base]
     base: Base<Node>,
@@ -28,9 +48,16 @@ pub struct KataruInterface {
 impl NodeVirtual for KataruInterface {
     fn init(base: Base<Node>) -> Self {
         Self {
+            story_src_path: "".to_string(),
+            story_path: "".to_string(),
             bookmark_path: "".to_string(),
+            codegen_path: "".to_string(),
             default_passage: "".to_string(),
             runner: None,
+            watch_dir: None,
+            watch_poll_time: 0.0,
+            watch_poll_interval: 0.0,
+            modified_time: None,
             debug_level: DEBUG_NONE,
             base,
         }
@@ -64,63 +91,54 @@ impl KataruInterface {
         codegen_path: GodotString,
         default_passage: GodotString,
         debug_level: DebugLevel,
+        watch_poll_interval: f64,
     ) {
+        self.story_src_path = story_src_path.into();
+        self.story_path = story_path.into();
+        self.bookmark_path = bookmark_path.into();
+        self.codegen_path = codegen_path.into();
+        self.default_passage = default_passage.into();
+        self.debug_level = debug_level;
+        self.watch_poll_interval = watch_poll_interval;
+
         if self.debug_level >= DEBUG_INFO {
             godot_print!("Kataru.init()");
         }
-        if let Err(err) = self.try_init(
-            story_src_path.into(),
-            story_path.into(),
-            bookmark_path.into(),
-            codegen_path.into(),
-            default_passage.into(),
-            debug_level,
-        ) {
+        if let Err(err) = self.try_init() {
             godot_fatal!(self, "Kataru.init(): {}", err);
         }
     }
-    fn try_init(
-        &mut self,
-        story_src_path: String,
-        story_path: String,
-        bookmark_path: String,
-        codegen_path: String,
-        default_passage: String,
-        debug_level: DebugLevel,
-    ) -> Result<()> {
-        self.bookmark_path = bookmark_path.into();
-        self.default_passage = default_passage.into();
-        self.debug_level = debug_level;
-
+    fn try_init(&mut self) -> Result<()> {
         // Validate and compile if a source path is specified.
-        if !story_src_path.is_empty() {
-            let story = Story::load(story_src_path)?;
+        if !self.story_src_path.is_empty() {
+            self.watch_dir = Some(Path::new(&self.story_src_path).join("**").join("*"));
+            let story = Story::load(&self.story_src_path)?;
             let mut bookmark = Bookmark::load_or_default(
                 &self.bookmark_path,
                 &story,
                 self.default_passage.clone(),
             )?;
             Validator::new(&story, &mut bookmark).validate()?;
-            story.save(&story_path)?;
+            story.save(&self.story_path)?;
             if self.debug_level >= DEBUG_INFO {
-                godot_print!("Kataru.init(): story compiled to {}", story_path)
+                godot_print!("Kataru.init(): story compiled to {}", self.story_path)
             }
 
             // Generate constants if enabled.
-            if !codegen_path.is_empty() {
-                codegen::try_codegen_consts(&codegen_path, &story)?;
+            if !self.codegen_path.is_empty() {
+                codegen::try_codegen_consts(&self.codegen_path, &story)?;
 
                 if self.debug_level >= DEBUG_INFO {
                     godot_print!(
                         "Kataru.init(): constants files generated to {}",
-                        codegen_path
+                        self.codegen_path
                     )
                 }
             }
         }
 
         // Load runner from compiled story.
-        let story = Story::load(&story_path)?;
+        let story = Story::load(&self.story_path)?;
         let bookmark =
             Bookmark::load_or_default(&self.bookmark_path, &story, self.default_passage.clone())?;
         self.runner = Some(Runner::init(bookmark, story, false)?);
@@ -263,6 +281,39 @@ impl KataruInterface {
             Line::InvalidChoice => self.base.emit_signal(Self::INVALID_CHOICE.into(), &[]),
             Line::End => self.base.emit_signal(Self::END.into(), &[]),
         };
+    }
+
+    fn watch_dir_changed(&mut self) -> bool {
+        if let Some(watch_dir) = &self.watch_dir {
+            let old_modified_time = self.modified_time;
+            self.modified_time = last_modified_time(watch_dir);
+            godot_print!("mtime: {:?}, {:?}", old_modified_time, self.modified_time);
+            match (self.modified_time, old_modified_time) {
+                (Some(current), Some(previous)) => current != previous,
+                (Some(_), None) => true,
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    #[func]
+    fn watch_story_dir(&mut self, delta: f64) {
+        // File watcher
+        self.watch_poll_time += delta;
+        if self.watch_poll_time < self.watch_poll_interval {
+            return;
+        }
+        self.watch_poll_time -= self.watch_poll_interval;
+        if self.watch_dir_changed() {
+            if self.debug_level >= DEBUG_INFO {
+                godot_print!("Kataru story directory changed.")
+            }
+            if let Err(err) = self.try_init() {
+                godot_fatal!(self, "Kataru.init(): {}", err);
+            }
+        }
     }
 
     #[signal]

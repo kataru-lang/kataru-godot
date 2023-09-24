@@ -19,6 +19,7 @@ const CODEGEN_PATH = "res://kataru-godot/characters.gd"
 const BOOKMARK_PATH = "user://kataru-bookmark.yml"
 const DEFAULT_PASSAGE = "Start"
 const DEBUG_LEVEL = DebugLevel.INFO
+const WATCH_POLL_INTERVAL = 0.5
 
 const Character = preload("res://kataru-godot/characters.gd")
 
@@ -73,17 +74,14 @@ func _ready():
 		story_src_path = ProjectSettings.globalize_path(STORY_PATH)
 		codegen_path = ProjectSettings.globalize_path(CODEGEN_PATH)
 
-	(
-		self
-		. ffi
-		. init(
-			story_src_path,
-			ProjectSettings.globalize_path(COMPILED_STORY_PATH),
-			ProjectSettings.globalize_path(BOOKMARK_PATH),
-			codegen_path,
-			DEFAULT_PASSAGE,
-			DEBUG_LEVEL,
-		)
+	self.ffi.init(
+		story_src_path,
+		ProjectSettings.globalize_path(COMPILED_STORY_PATH),
+		ProjectSettings.globalize_path(BOOKMARK_PATH),
+		codegen_path,
+		DEFAULT_PASSAGE,
+		DEBUG_LEVEL,
+		WATCH_POLL_INTERVAL
 	)
 
 	# Connect remaining callbacks.
@@ -106,5 +104,5 @@ func _ready():
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(_delta):
-	pass
+func _process(delta):
+	self.ffi.watch_story_dir(delta)
