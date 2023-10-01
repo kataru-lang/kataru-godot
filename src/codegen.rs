@@ -5,7 +5,7 @@ struct StoryConsts {
     namespaces: Vec<String>,
     passages: Vec<String>,
     characters: Vec<String>,
-    commands: Map<String, Option<Params>>,
+    commands: Vec<(String, Option<Params>)>,
 }
 impl StoryConsts {
     /// Generates the code for
@@ -15,7 +15,7 @@ impl StoryConsts {
         let mut namespaces = Vec::<String>::with_capacity(story.sections.len());
         let mut passages = Vec::<String>::with_capacity(story.sections.len());
         let mut characters = Vec::<String>::with_capacity(story.sections.len());
-        let mut commands = Map::<String, Option<Params>>::with_capacity(story.sections.len());
+        let mut commands = Vec::<(String, Option<Params>)>::with_capacity(story.sections.len());
 
         // Keep track of namespace boundaries for passages and characters.
         // The last passage index used for this namespace`passage_bounds[namespace_enum]`.
@@ -31,7 +31,7 @@ impl StoryConsts {
                     passages.push(passage_name.to_string());
                 }
                 for (command_name, params) in &section.config.commands {
-                    commands.insert(command_name.to_string(), params.clone());
+                    commands.push((command_name.to_string(), params.clone()));
                 }
             } else {
                 namespaces.push(namespace.to_string());
@@ -42,7 +42,7 @@ impl StoryConsts {
                     passages.push(format!("{}:{}", namespace, passage_name));
                 }
                 for (command_name, params) in &section.config.commands {
-                    commands.insert(format!("{}:{}", namespace, command_name), params.clone());
+                    commands.push((format!("{}:{}", namespace, command_name), params.clone()));
                 }
             }
         }
@@ -50,6 +50,7 @@ impl StoryConsts {
         namespaces.sort();
         passages.sort();
         characters.sort();
+        commands.sort_by(|(name1, _params1), (name2, _params2)| name1.cmp(name2));
         Self {
             namespaces,
             passages,
@@ -146,7 +147,7 @@ static func property(property_name: String) -> Dictionary:
     )
 }
 
-fn fill_cmd_consts_template(values: Map<String, Option<Params>>) -> String {
+fn fill_cmd_consts_template(values: Vec<(String, Option<Params>)>) -> String {
     let def_separator = "\n";
     let list_separator = ",\n    ";
 
