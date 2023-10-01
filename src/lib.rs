@@ -28,10 +28,10 @@ fn last_modified_time(path: &PathBuf) -> Option<std::time::SystemTime> {
 #[derive(GodotClass)]
 #[class(base=Node)]
 pub struct KataruInterface {
-    story_src_path: String,
-    story_path: String,
-    bookmark_path: String,
-    codegen_path: String,
+    story_src_path: PathBuf,
+    story_path: PathBuf,
+    bookmark_path: PathBuf,
+    codegen_path: PathBuf,
     default_passage: String,
     debug_level: u8,
     runner: Option<Runner>,
@@ -48,10 +48,10 @@ pub struct KataruInterface {
 impl NodeVirtual for KataruInterface {
     fn init(base: Base<Node>) -> Self {
         Self {
-            story_src_path: "".to_string(),
-            story_path: "".to_string(),
-            bookmark_path: "".to_string(),
-            codegen_path: "".to_string(),
+            story_src_path: "".into(),
+            story_path: "".into(),
+            bookmark_path: "".into(),
+            codegen_path: "".into(),
             default_passage: "".to_string(),
             runner: None,
             watch_dir: None,
@@ -93,10 +93,10 @@ impl KataruInterface {
         debug_level: DebugLevel,
         watch_poll_interval: f64,
     ) {
-        self.story_src_path = story_src_path.into();
-        self.story_path = story_path.into();
-        self.bookmark_path = bookmark_path.into();
-        self.codegen_path = codegen_path.into();
+        self.story_src_path = story_src_path.to_string().into();
+        self.story_path = story_path.to_string().into();
+        self.bookmark_path = bookmark_path.to_string().into();
+        self.codegen_path = codegen_path.to_string().into();
         self.default_passage = default_passage.into();
         self.debug_level = debug_level;
         self.watch_poll_interval = watch_poll_interval;
@@ -110,8 +110,7 @@ impl KataruInterface {
     }
     fn try_init(&mut self) -> Result<()> {
         // Validate and compile if a source path is specified.
-        if !self.story_src_path.is_empty() {
-            self.watch_dir = Some(Path::new(&self.story_src_path).join("**").join("*"));
+        let story = if !self.story_src_path.as_os_str().is_empty() {
             let story = Story::load(&self.story_src_path)?;
             let mut bookmark = Bookmark::load_or_default(
                 &self.bookmark_path,
@@ -121,24 +120,33 @@ impl KataruInterface {
             Validator::new(&story, &mut bookmark).validate()?;
             story.save(&self.story_path)?;
             if self.debug_level >= DEBUG_INFO {
-                godot_print!("Kataru.init(): story compiled to {}", self.story_path)
+                godot_print!(
+                    "Kataru.init(): story compiled to {}",
+                    self.story_path.display()
+                )
             }
 
             // Generate constants if enabled.
-            if !self.codegen_path.is_empty() {
+            if !self.codegen_path.as_os_str().is_empty() {
                 codegen::try_codegen_consts(&self.codegen_path, &story)?;
 
                 if self.debug_level >= DEBUG_INFO {
                     godot_print!(
                         "Kataru.init(): constants files generated to {}",
-                        self.codegen_path
+                        self.codegen_path.display()
                     )
                 }
             }
-        }
+
+            self.watch_dir = Some(Path::new(&self.story_src_path).join("**").join("*"));
+            self.modified_time = last_modified_time(self.watch_dir.as_ref().unwrap());
+
+            story
+        } else {
+            Story::load(&self.story_path)?
+        };
 
         // Load runner from compiled story.
-        let story = Story::load(&self.story_path)?;
         let bookmark =
             Bookmark::load_or_default(&self.bookmark_path, &story, self.default_passage.clone())?;
         self.runner = Some(Runner::init(bookmark, story, false)?);
@@ -207,6 +215,26 @@ impl KataruInterface {
         }
     }
 
+    // Transforms a command name into the normalized version.
+    // This is used for lookups to command adapters in GDScript.
+    fn get_normalized_command(command: &str) -> String {
+        // Get positions of character name.
+        let mut colon: usize = 0;
+        let mut dot: usize = 0;
+        for (i, c) in command.chars().enumerate() {
+            match c {
+                ':' => colon = i,
+                '.' => dot = i,
+                _ => {}
+            }
+        }
+        match (colon, dot) {
+            (_, 0) => command.to_string(),
+            (0, _) => format!("$character.{}", &command[dot + 1..]),
+            (_, _) => format!("{}:$character.{}", &command[0..colon], &command[dot + 1..]),
+        }
+    }
+
     /// Run the current passage until a choice is encountered.
     #[func]
     pub fn run_until_choice(&mut self, passage: GodotString) {
@@ -268,6 +296,7 @@ impl KataruInterface {
                 Self::COMMAND.into(),
                 &[
                     Variant::from(command.name.to_string()),
+                    Variant::from(Self::get_normalized_command(&command.name)),
                     serde_to_json(&command.params),
                 ],
             ),
@@ -287,7 +316,6 @@ impl KataruInterface {
         if let Some(watch_dir) = &self.watch_dir {
             let old_modified_time = self.modified_time;
             self.modified_time = last_modified_time(watch_dir);
-            godot_print!("mtime: {:?}, {:?}", old_modified_time, self.modified_time);
             match (self.modified_time, old_modified_time) {
                 (Some(current), Some(previous)) => current != previous,
                 (Some(_), None) => true,

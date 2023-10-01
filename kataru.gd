@@ -15,13 +15,16 @@ enum DebugLevel { NONE, INFO, VERBOSE }
 
 const STORY_PATH = "res://kataru-story"
 const COMPILED_STORY_PATH = "res://kataru-story.bin"
-const CODEGEN_PATH = "res://kataru-godot/characters.gd"
+const CODEGEN_PATH = "res://kataru-godot/consts"
 const BOOKMARK_PATH = "user://kataru-bookmark.yml"
 const DEFAULT_PASSAGE = "Start"
 const DEBUG_LEVEL = DebugLevel.INFO
 const WATCH_POLL_INTERVAL = 0.5
 
-const Character = preload("res://kataru-godot/characters.gd")
+const Characters = preload("res://kataru-godot/consts/characters.gd")
+const Passages = preload("res://kataru-godot/consts/passages.gd")
+const Namespaces = preload("res://kataru-godot/consts/namespaces.gd")
+var Commands = preload("res://kataru-godot/consts/commands.gd").new()
 
 # Interface with Rust.
 var ffi = KataruInterface.new()
@@ -37,7 +40,7 @@ signal dialogue(character: String, text: String, attributes: Array)
 signal choices(choices: Array, timeout: float)
 
 # Signals a command issued by Kataru, which should trigger a function call.
-signal command(cmd_name: String, params: Dictionary)
+signal command(cmd_name: String, normalized_name: String, params: Dictionary)
 
 # Signals a command asking for input from the user to be stored in Kataru state.
 signal input_command(input: Dictionary, timeout: float)
@@ -59,6 +62,17 @@ func run_until_choice(passage: String):
 # Runs the next line of dialogue in the current passage.
 func next(input: String):
 	self.ffi.next(input)
+
+
+# Register a function.
+# If registering for a specific character, specify the char_name.
+func register(f: Callable, cmd_name: String, char_name: String = ""):
+	if char_name != "":
+		print("register for character: ", char_name)
+		cmd_name = cmd_name.replace("$character.", char_name + ".")
+	if Kataru.DEBUG_LEVEL > DebugLevel.NONE:
+		print("Kataru.register(): Registering ", cmd_name)
+	Commands.registry[cmd_name] = f
 
 
 # Called when the node enters the scene tree for the first time.
@@ -93,11 +107,7 @@ func _ready():
 	self.ffi.choices.connect(
 		func(choice_list: Array, timeout: float): self.choices.emit(choice_list, timeout)
 	)
-	self.ffi.command.connect(
-		func(cmd_name: String, params: String): self.command.emit(
-			cmd_name, JSON.parse_string(params)
-		)
-	)
+	self.ffi.command.connect(self.Commands.call_command)
 	self.ffi.input_command.connect(
 		func(inputs: Dictionary, timeout: float): self.input.emit(inputs, timeout)
 	)
