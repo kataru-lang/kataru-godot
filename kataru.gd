@@ -6,7 +6,7 @@
 # ```toml
 # [autoload]
 #
-# Kataru="*res://kataru-godot/kataru.gd"
+# Kataru="*res://addons/kataru/kataru.gd"
 # ```
 @tool
 extends Node
@@ -15,16 +15,16 @@ enum DebugLevel { NONE, INFO, VERBOSE }
 
 const STORY_PATH = "res://kataru-story"
 const COMPILED_STORY_PATH = "res://kataru-story.bin"
-const CODEGEN_PATH = "res://kataru-godot/consts"
+const CODEGEN_PATH = "res://addons/kataru/consts"
 const BOOKMARK_PATH = "user://kataru-bookmark.yml"
 const DEFAULT_PASSAGE = "Start"
 const DEBUG_LEVEL = DebugLevel.INFO
 const WATCH_POLL_INTERVAL = 0.5
 
-const Characters = preload("res://kataru-godot/consts/characters.gd")
-const Passages = preload("res://kataru-godot/consts/passages.gd")
-const Namespaces = preload("res://kataru-godot/consts/namespaces.gd")
-var Commands = preload("res://kataru-godot/consts/commands.gd").new()
+const Characters = preload("res://addons/kataru/consts/characters.gd")
+const Passages = preload("res://addons/kataru/consts/passages.gd")
+const Namespaces = preload("res://addons/kataru/consts/namespaces.gd")
+var Commands = preload("res://addons/kataru/consts/commands.gd").new()
 
 # Interface with Rust.
 var ffi = KataruInterface.new()
@@ -70,7 +70,7 @@ func register(f: Callable, cmd_name: String, char_name: String = ""):
 	if char_name != "":
 		print("register for character: ", char_name)
 		cmd_name = cmd_name.replace("$character.", char_name + ".")
-	if Kataru.DEBUG_LEVEL > DebugLevel.NONE:
+	if DEBUG_LEVEL > DebugLevel.NONE:
 		print("Kataru.register(): Registering ", cmd_name)
 	Commands.registry[cmd_name] = f
 
