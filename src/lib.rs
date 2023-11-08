@@ -288,7 +288,9 @@ impl KataruInterface {
             Line::Choices(choices) => self.base.emit_signal(
                 Self::CHOICES.into(),
                 &[
-                    Variant::from(Array::from(choices.choices.as_slice())),
+                    Variant::from(Array::<GodotString>::from_iter(
+                        choices.choices.iter().map(|e| e.into()),
+                    )),
                     Variant::from(choices.timeout),
                 ],
             ),
