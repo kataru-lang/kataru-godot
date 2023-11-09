@@ -76,16 +76,16 @@ Until the addon is available there, install as a git submodule in your Godot pro
 1. In the Godot Editor, under `Project` -> `Project Settings` -> `Plugins` enable the `Kataru` plugin.
 1. By default, the plugin will create a template story in `res://kataru/story`. If you use a different folder or not generate the template, create your own directory and configure the `STORY_PATH` in [`kataru.gd`](kataru.gd).
 
-### Recipes
+## Recipes
 
-#### Progress the dialogue
+### Progress the dialogue
 
 Call `Kataru.run(<passage>)` on the passage you want to run to start the dialogue and run the first line.
 Passage name constants are auto-generated in `Kataru.Passages`.
 
 Call `Kataru.next(<input>)` to go to the next line.
 
-#### Listening to dialogue events
+### Listening to dialogue events
 
 To listen to dialogue events, bind to `Kataru` class' signals.
 
@@ -136,7 +136,7 @@ func _on_ready():
 
 Note that the `Kataru.Commands` constant will prefix character specific commands with `character_`.
 
-### Notes and caveats
+## Notes and caveats
 
 - Do NOT open the story YAML files in Godot, it will try to autoformat them incorrectly.
 - Constant files are generated from reading your story file. These can be used for creating dropdown menus for your scripts (called PROPERTY lists in Godot), but unfortunately these will only be refreshed in the editor has been restarted.
