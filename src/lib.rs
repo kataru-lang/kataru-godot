@@ -68,6 +68,29 @@ fn serde_to_json<T: serde::Serialize>(value: &T) -> Variant {
     Variant::from(serde_json::to_string(value).unwrap())
 }
 
+fn variant_to_val(variant: Variant) -> Result<Value> {
+    Ok(match variant.get_type() {
+        VariantType::Bool => Value::Bool(variant.to::<bool>()),
+        VariantType::Float => Value::Number(variant.to::<f64>()),
+        VariantType::String => Value::String(variant.to::<String>()),
+        VariantType::StringName => Value::String(variant.to::<String>()),
+        _ => {
+            return Err(error!(
+                "Variant could not be converted to a Kataru value: {}",
+                variant
+            ))
+        }
+    })
+}
+
+fn val_to_variant(value: &Value) -> Variant {
+    match value {
+        Value::Bool(b) => Variant::from(b.clone()),
+        Value::Number(f) => Variant::from(f.clone()),
+        Value::String(s) => Variant::from(s.clone()),
+    }
+}
+
 /// Logs a fatal assertion by sending a signal to Godot.
 /// Can only be called from a struct that implements NodeVirtual that has a FATAL signal set up.
 #[macro_export]
@@ -164,7 +187,7 @@ impl KataruInterface {
             godot_error!("Kataru.next('{}'): {}", input, err);
         }
     }
-    fn try_next(&mut self, input: String) -> Result<()> {
+    fn try_next(&mut self, input: String) -> Result<Line> {
         if let Some(runner) = &mut self.runner {
             let line = runner.next(&input)?;
 
@@ -172,8 +195,10 @@ impl KataruInterface {
                 godot_print!("Kataru.next('{}'): {:#?}", input, runner.bookmark());
             }
             self.emit_line_signal(&line);
+            Ok(line)
+        } else {
+            Err(error!("Kataru was not initialized."))
         }
-        Ok(())
     }
 
     /// Go to the given `passage`, but do not run the first line.
@@ -255,21 +280,80 @@ impl KataruInterface {
     }
     fn try_run_until_choice(&mut self, passage: String) -> Result<()> {
         self.try_goto(passage)?;
-        if let Some(runner) = self.runner.as_mut() {
-            loop {
-                match runner.next("")? {
-                    Line::Choices(_) | Line::End => {
-                        return Ok(());
-                    }
-                    _ => {}
+        loop {
+            let line = self.try_next("".to_string())?;
+            match line {
+                Line::Choices(_) | Line::End => {
+                    return Ok(());
                 }
+                _ => {}
             }
+        }
+    }
+
+    pub fn get_state(&self, variable: GodotString) -> Variant {
+        match self.try_get_state(variable.to_string()) {
+            Ok(value) => val_to_variant(value),
+            Err(err) => {
+                godot_error!("Kataru.get_state({}): {}", &variable, err);
+                Variant::nil()
+            }
+        }
+    }
+    fn try_get_state(&self, variable: String) -> Result<&Value> {
+        if let Some(runner) = &self.runner {
+            return runner.bookmark().value(&variable);
+        }
+        Err(error!("Kataru uninitialized."))
+    }
+    #[func]
+    pub fn set_state(&mut self, variable: GodotString, value: Variant) {
+        if self.debug_level >= DEBUG_INFO {
+            godot_print!("Kataru.set_state({}, {})", variable, value);
+        }
+        if let Err(err) = self.try_set_state(variable.to_string(), value) {
+            godot_error!("Kataru.run_until_choice({}): {}", &variable, err)
+        }
+    }
+    pub fn try_set_state(&mut self, variable: String, variant: Variant) -> Result<()> {
+        let value = variant_to_val(variant)?;
+        if let Some(runner) = self.runner.as_mut() {
+            runner.set_state(
+                StateMod {
+                    var: &variable,
+                    op: AssignOperator::None,
+                },
+                value,
+            )
         } else {
             godot_fatal!(
                 self,
                 "Kataru was not initialized before call to run_until_choice."
             );
             Err(error!("Kataru uninitialized."))
+        }
+    }
+
+    /// Exit the current dialogue passage.
+    #[func]
+    pub fn save(&mut self) {
+        if let Some(runner) = &mut self.runner {
+            if let Err(err) = runner.bookmark().save(&self.bookmark_path) {
+                godot_error!("Kataru.save(): {}", err)
+            }
+        }
+    }
+
+    pub fn load(&mut self, path: GodotString) {
+        if let Err(err) = self.try_load(path.to_string().into()) {
+            godot_error!("Kataru.load(): {}", err);
+        }
+    }
+    fn try_load(&mut self, path: PathBuf) -> Result<()> {
+        if let Some(runner) = self.runner.as_mut() {
+            runner.load_bookmark(Bookmark::load(&path)?)
+        } else {
+            Err(error!("Kataru was not initialized."))
         }
     }
 

@@ -122,6 +122,22 @@ func _ready():
 	self.ffi.end.connect(func(): self.end.emit())
 
 
+func set_state(variable: String, value):
+	self.ffi.set_state(variable, value)
+
+
+func get_state(variable: String):
+	self.ffi.get_state(variable)
+
+
+func save():
+	self.ffi.save()
+
+
+func load(path: String):
+	self.ffi.load(path)
+
+
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float):
 	self.ffi.watch_story_dir(delta)
