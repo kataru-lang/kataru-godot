@@ -52,6 +52,9 @@ signal input_command(input: Dictionary, timeout: float)
 # Signals that Kataru has loaded. Other autoload scripts can wait for this signal before running.
 signal loaded
 
+# Signals that Kataru has reached the end of the current passage.
+signal end
+
 
 # Runs the first line in a given passage.
 func run(passage: String):
@@ -116,6 +119,7 @@ func _ready():
 	self.ffi.input_command.connect(
 		func(inputs: Dictionary, timeout: float): self.input.emit(inputs, timeout)
 	)
+	self.ffi.end.connect(func(): self.end.emit())
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
