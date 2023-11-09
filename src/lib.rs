@@ -199,15 +199,23 @@ impl KataruInterface {
     #[func]
     pub fn run(&mut self, passage: GodotString) {
         if self.debug_level >= DEBUG_INFO {
-            godot_print!("Kataru.run({})", passage);
+            godot_print!("Kataru.run('{}')", passage);
         }
         if let Err(err) = self.try_run(passage.to_string()) {
-            godot_error!("Kataru.run(): {}", err)
+            godot_error!("Kataru.run('{}'): {}", passage, err)
         }
     }
     fn try_run(&mut self, passage: String) -> Result<()> {
         if let Some(runner) = self.runner.as_mut() {
-            runner.run(passage)?;
+            let line = runner.run(passage)?;
+            if self.debug_level >= DEBUG_VERBOSE {
+                godot_print!(
+                    "Kataru.run('{}'): {:#?}",
+                    runner.bookmark().passage(),
+                    runner.bookmark()
+                );
+            }
+            self.emit_line_signal(&line);
             Ok(())
         } else {
             godot_fatal!(self, "Kataru was not initialized before call to run.");

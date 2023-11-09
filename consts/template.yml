@@ -1,0 +1,42 @@
+---
+# Define what namespace this file is in.
+namespace: global
+
+# Define all variables.
+state:
+  var: 0
+
+# Configure the scene. List your characters, commands, etc.
+characters:
+  Alice:
+  Bob:
+
+# Define all commands
+commands:
+  wait:
+    duration: 0.3
+  $character.set_animator_trigger:
+    name: ""
+
+attributes:
+  i: true
+---
+Start:
+  - Alice: Welcome to my <i>story</i>!
+  - Bob: Want a coffee?
+  - choices:
+      Yes: YesCoffee
+      No: NoCoffee
+
+YesCoffee:
+  - Alice: Yeah, thanks!
+  - call: End
+
+NoCoffee:
+  - Alice: No thanks.
+  - wait: { duration: 1 }
+  - Bob: Want to end this story?
+  - call: End
+
+End:
+  - Alice: The end!

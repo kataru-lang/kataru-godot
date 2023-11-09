@@ -13,14 +13,18 @@ extends Node
 
 enum DebugLevel { NONE, INFO, VERBOSE }
 
-const STORY_PATH = "res://kataru-story"
-const COMPILED_STORY_PATH = "res://kataru-story.bin"
-const CODEGEN_PATH = "res://addons/kataru/consts"
+const KATARU_DIR = "res://kataru"
+const STORY_PATH = "res://kataru/story"
+const COMPILED_STORY_PATH = "res://kataru/story.bin"
 const BOOKMARK_PATH = "user://kataru-bookmark.yml"
 const DEFAULT_PASSAGE = "Start"
 const DEBUG_LEVEL = DebugLevel.INFO
 const WATCH_POLL_INTERVAL = 0.5
 
+const CODEGEN_PATH = "res://addons/kataru/consts"
+const TEMPLATE_PATH = "res://addons/kataru/consts/template.yml"
+
+const Directories = preload("res://addons/kataru/directories.gd")
 const Characters = preload("res://addons/kataru/consts/characters.gd")
 const Passages = preload("res://addons/kataru/consts/passages.gd")
 const Namespaces = preload("res://addons/kataru/consts/namespaces.gd")
@@ -34,10 +38,10 @@ var ffi = KataruInterface.new()
 # ------------------------------------------------------------------------------
 
 # Signals a character saying a line of dialogue.
-signal dialogue(character: String, text: String, attributes: Array)
+signal dialogue(character: String, text: String, attributes: Array[Dictionary])
 
 # Signals an array of choices that the player can make.
-signal choices(choices: Array, timeout: float)
+signal choices(choices: Array[String], timeout: float)
 
 # Signals a command issued by Kataru, which should trigger a function call.
 signal command(cmd_name: String, normalized_name: String, params: Dictionary)
@@ -60,7 +64,7 @@ func run_until_choice(passage: String):
 
 
 # Runs the next line of dialogue in the current passage.
-func next(input: String):
+func next(input: String = ""):
 	self.ffi.next(input)
 
 
@@ -85,6 +89,7 @@ func _ready():
 	var story_src_path = ""
 	var codegen_path = ""
 	if !OS.has_feature("standalone"):
+		Directories.setup()
 		story_src_path = ProjectSettings.globalize_path(STORY_PATH)
 		codegen_path = ProjectSettings.globalize_path(CODEGEN_PATH)
 
@@ -105,7 +110,7 @@ func _ready():
 		)
 	)
 	self.ffi.choices.connect(
-		func(choice_list: Array, timeout: float): self.choices.emit(choice_list, timeout)
+		func(choice_list: Array[String], timeout: float): self.choices.emit(choice_list, timeout)
 	)
 	self.ffi.command.connect(self.Commands.call_command)
 	self.ffi.input_command.connect(
@@ -114,5 +119,5 @@ func _ready():
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta):
+func _process(delta: float):
 	self.ffi.watch_story_dir(delta)
