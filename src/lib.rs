@@ -169,9 +169,19 @@ impl KataruInterface {
             Story::load(&self.story_path)?
         };
 
+        // Load bookmark.
+        let bookmark = if self.bookmark_path.as_os_str().is_empty() {
+            // If no path provided, just use default bookmark.
+            Bookmark::default()
+        } else if self.default_passage.is_empty() {
+            // If a path is provided but no default passage, then don't try to generate a bookmark.
+            Bookmark::load(&self.bookmark_path)?
+        } else {
+            // Otherwise, try loading a bookmark and fallback to making a default.
+            Bookmark::load_or_default(&self.bookmark_path, &story, self.default_passage.clone())?
+        };
+
         // Load runner from compiled story.
-        let bookmark =
-            Bookmark::load_or_default(&self.bookmark_path, &story, self.default_passage.clone())?;
         self.runner = Some(Runner::init(bookmark, story, false)?);
         self.base.emit_signal(Self::LOADED.into(), &[]);
         Ok(())
@@ -336,7 +346,8 @@ impl KataruInterface {
 
     /// Exit the current dialogue passage.
     #[func]
-    pub fn save(&mut self) {
+    pub fn save(&mut self, path: GodotString) {
+        self.bookmark_path = path.to_string().into();
         if let Some(runner) = &mut self.runner {
             if let Err(err) = runner.bookmark().save(&self.bookmark_path) {
                 godot_error!("Kataru.save(): {}", err)
@@ -350,8 +361,9 @@ impl KataruInterface {
         }
     }
     fn try_load(&mut self, path: PathBuf) -> Result<()> {
+        self.bookmark_path = path;
         if let Some(runner) = self.runner.as_mut() {
-            runner.load_bookmark(Bookmark::load(&path)?)
+            runner.load_bookmark(Bookmark::load(&self.bookmark_path)?)
         } else {
             Err(error!("Kataru was not initialized."))
         }

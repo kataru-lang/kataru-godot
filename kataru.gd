@@ -13,11 +13,12 @@ extends Node
 
 enum DebugLevel { NONE, INFO, VERBOSE }
 
+# Constants to be configured.
 const KATARU_DIR = "res://kataru"
 const STORY_PATH = "res://kataru/story"
 const COMPILED_STORY_PATH = "res://kataru/story.bin"
 const BOOKMARK_PATH = "user://kataru-bookmark.yml"
-const DEFAULT_PASSAGE = "Start"
+const DEFAULT_PASSAGE = ""
 const DEBUG_LEVEL = DebugLevel.INFO
 const WATCH_POLL_INTERVAL = 0.5
 
@@ -130,8 +131,8 @@ func get_state(variable: String):
 	self.ffi.get_state(variable)
 
 
-func save():
-	self.ffi.save()
+func save(path: String):
+	self.ffi.save(path)
 
 
 func load(path: String):
