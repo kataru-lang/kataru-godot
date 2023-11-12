@@ -4,26 +4,20 @@ extends EditorPlugin
 # Replace this value with a PascalCase autoload name, as per the GDScript style guide.
 const AUTOLOAD_NAME: String = "Kataru"
 
-# A class member to hold the dock during the plugin life cycle.
-var dock
+var scene
 
 
 func _enter_tree():
-	# Initialization of the plugin goes here.
-	# Load the dock scene and instantiate it.
-	dock = preload("res://addons/kataru/dock.tscn").instantiate()
-
-	# Add the loaded scene to the docks.
-	add_control_to_dock(DOCK_SLOT_LEFT_UR, dock)
-	# Note that LEFT_UL means the left of the editor, upper-left dock.
-
-	# The autoload can be a scene or script file.
-	add_autoload_singleton(AUTOLOAD_NAME, "res://addons/kataru/kataru.gd")
+	add_custom_type(
+		"Kataru",
+		"Node",
+		preload("res://addons/kataru/kataru.gd"),
+		preload("res://addons/kataru/images/editor.png")
+	)
+	add_autoload_singleton(AUTOLOAD_NAME, "res://addons/kataru/kataru.tscn")
+	# add_control_to_dock(DOCK_SLOT_LEFT_UR, self.get_editor_interface().edit_node(Kataru))
 
 
 func _exit_tree():
-	# Clean-up of the plugin goes here.
-	# Remove the dock.
-	remove_control_from_docks(dock)
-	# Erase the control from the memory.
-	dock.free()
+	remove_autoload_singleton(AUTOLOAD_NAME)
+	remove_custom_type("Kataru")

@@ -14,13 +14,13 @@ extends Node
 enum DebugLevel { NONE, INFO, VERBOSE }
 
 # Constants to be configured.
-const KATARU_DIR = "res://kataru"
-const STORY_PATH = "res://kataru/story"
-const COMPILED_STORY_PATH = "res://kataru/story.bin"
-const BOOKMARK_PATH = "user://kataru-bookmark.yml"
-const DEFAULT_PASSAGE = ""
-const DEBUG_LEVEL = DebugLevel.INFO
-const WATCH_POLL_INTERVAL = 0.5
+@export var root_path = "res://kataru"
+@export var story_path = "res://kataru/story"
+@export var compiled_story_path = "res://kataru/story.bin"
+@export var bookmark_path = "user://kataru-bookmark.yml"
+@export var default_passage = ""
+@export var debug_level = DebugLevel.INFO
+@export var watch_poll_interval = 0.5
 
 const CODEGEN_PATH = "res://addons/kataru/consts"
 const TEMPLATE_PATH = "res://addons/kataru/consts/template.yml"
@@ -78,36 +78,15 @@ func register(f: Callable, cmd_name: String, char_name: String = ""):
 	if char_name != "":
 		print("register for character: ", char_name)
 		cmd_name = cmd_name.replace("$character.", char_name + ".")
-	if DEBUG_LEVEL > DebugLevel.NONE:
+	if self.debug_level > DebugLevel.NONE:
 		print("Kataru.register(): Registering ", cmd_name)
 	Commands.registry[cmd_name] = f
 
 
-# Called when the node enters the scene tree for the first time.
-func _ready():
-	# Connect callbacks used in init.
+func _connect_callbacks():
 	self.ffi.loaded.connect(func(): self.loaded.emit())
 	self.ffi.fatal.connect(func(message: String): assert(false, message))
 
-	# Provide a story source path to Rust to compile the story to bytecode, but only if we're in the editor.
-	var story_src_path = ""
-	var codegen_path = ""
-	if !OS.has_feature("standalone"):
-		Directories.setup()
-		story_src_path = ProjectSettings.globalize_path(STORY_PATH)
-		codegen_path = ProjectSettings.globalize_path(CODEGEN_PATH)
-
-	self.ffi.init(
-		story_src_path,
-		ProjectSettings.globalize_path(COMPILED_STORY_PATH),
-		ProjectSettings.globalize_path(BOOKMARK_PATH),
-		codegen_path,
-		DEFAULT_PASSAGE,
-		DEBUG_LEVEL,
-		WATCH_POLL_INTERVAL
-	)
-
-	# Connect remaining callbacks.
 	self.ffi.dialogue.connect(
 		func(char_name: String, text: String, attributes: String): self.dialogue.emit(
 			char_name, text, JSON.parse_string(attributes)
@@ -121,6 +100,32 @@ func _ready():
 		func(inputs: Dictionary, timeout: float): self.input.emit(inputs, timeout)
 	)
 	self.ffi.end.connect(func(): self.end.emit())
+
+
+func init():
+	# Provide a story source path to Rust to compile the story to bytecode, but only if we're in the editor.
+	var story_src_path = ""
+	var codegen_path = ""
+	if !OS.has_feature("standalone"):
+		Directories.setup()
+		story_src_path = ProjectSettings.globalize_path(self.story_path)
+		codegen_path = ProjectSettings.globalize_path(CODEGEN_PATH)
+
+	self.ffi.init(
+		story_src_path,
+		ProjectSettings.globalize_path(self.compiled_story_path),
+		ProjectSettings.globalize_path(self.bookmark_path),
+		codegen_path,
+		self.default_passage,
+		self.debug_level,
+		self.watch_poll_interval
+	)
+
+
+# Called when the node enters the scene tree for the first time.
+func _ready():
+	self._connect_callbacks()
+	self.init()
 
 
 func set_state(variable: String, value):
