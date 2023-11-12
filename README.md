@@ -92,14 +92,14 @@ To listen to dialogue events, bind to `Kataru` class' signals.
 For example:
 ```py
 func _on_choices(choices: Array, _timeout: float):
-    pass
+  pass
 
 func _on_dialogue(char_name: String, text: String, attributes: Array):
-    pass
+  pass
 
 func _ready():
-	Kataru.dialogue.connect(self._on_dialogue)
-	Kataru.choices.connect(self._on_choices)
+  Kataru.dialogue.connect(self._on_dialogue)
+  Kataru.choices.connect(self._on_choices)
 ```
 
 NOTE: Make sure you connect to the events _before_ you call `Kataru.next()`.
@@ -111,27 +111,27 @@ To register a global command, use:
 
 ```py
 func my_custom_command(clip: String):
-	pass
+  pass
 
 func _on_ready():
-    Kataru.register(
-		self.my_custom_command,
-        Kataru.Commands.my_custom_command
-	)
+  Kataru.register(
+    self.my_custom_command,
+    Kataru.Commands.my_custom_command
+  )
 ```
 
 For a command on a specific `Character` (similar to an instance method), use:
 
 ```py
 func my_char_command(clip: String):
-    pass
+  pass
 
 func _on_ready():
-    Kataru.register(
-		self.my_char_command,
-        Kataru.Commands.character_my_char_command,
-        self.kataru_name
-	)
+  Kataru.register(
+    self.my_char_command,
+    Kataru.Commands.character_my_char_command,
+    self.kataru_name
+  )
 ```
 
 Note that the `Kataru.Commands` constant will prefix character specific commands with `character_`.
