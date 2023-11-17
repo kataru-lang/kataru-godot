@@ -9,8 +9,9 @@ const NAMES: Array[String] = [
     End,
     NoCoffee,
     Start,
-    YesCoffee
+    YesCoffee,
 ]
+
 
 # Returns the property for usage in the editor.
 static func property(property_name: String) -> Dictionary:

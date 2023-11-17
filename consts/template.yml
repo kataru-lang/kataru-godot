@@ -10,6 +10,7 @@ state:
 characters:
   Alice:
   Bob:
+  Charlie:
 
 # Define all commands
 commands:

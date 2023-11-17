@@ -5,11 +5,12 @@ const wait = "wait"
 
 # Adapters.
 var adapters: Dictionary = {
-    character_set_animator_trigger: func(f: Callable, params: Dictionary): f.call(params.name),
-    wait: func(f: Callable, params: Dictionary): f.call(params.duration)
+	character_set_animator_trigger: func(f: Callable, params: Dictionary): f.call(params.name),
+	wait: func(f: Callable, params: Dictionary): f.call(params.duration)
 }
 
 var registry: Dictionary = {}
+
 
 func call_command(cmd_name: String, normalized_name: String, params: String):
 	self.adapters[normalized_name].call(self.registry[cmd_name], JSON.parse_string(params))

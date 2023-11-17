@@ -3,8 +3,9 @@
 const Global = "global"
 
 const NAMES: Array[String] = [
-    Global
+    Global,
 ]
+
 
 # Returns the property for usage in the editor.
 static func property(property_name: String) -> Dictionary:

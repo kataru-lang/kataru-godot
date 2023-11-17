@@ -128,8 +128,9 @@ fn fill_consts_template(values: Vec<String>) -> String {
 {defs}
 
 const NAMES: Array[String] = [
-    {vars}
+    {vars},
 ]
+
 
 # Returns the property for usage in the editor.
 static func property(property_name: String) -> Dictionary:
@@ -170,6 +171,7 @@ var adapters: Dictionary = {{
 }}
 
 var registry: Dictionary = {{}}
+
 
 func call_command(cmd_name: String, normalized_name: String, params: String):
 	self.adapters[normalized_name].call(self.registry[cmd_name], JSON.parse_string(params))
